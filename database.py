@@ -50,7 +50,11 @@ def init_db():
                 user_id INTEGER PRIMARY KEY,
                 weather_time TEXT,
                 mood_time TEXT,
-                city TEXT DEFAULT 'Краснодар'
+                city TEXT DEFAULT 'Краснодар',
+                latitude REAL DEFAULT 45.0448,
+                longitude REAL DEFAULT 38.9760,
+                last_weather_date TEXT,
+                last_mood_date TEXT
             )
         """)
         
@@ -76,6 +80,27 @@ def init_db():
             conn.execute("ALTER TABLE reminders ADD COLUMN user_first_name TEXT DEFAULT 'Мария'")
         except sqlite3.OperationalError:
             # Column already exists, do nothing
+            pass
+
+        # Self-migration 3: try to add columns to user_settings if missing
+        try:
+            conn.execute("ALTER TABLE user_settings ADD COLUMN latitude REAL DEFAULT 45.0448")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE user_settings ADD COLUMN longitude REAL DEFAULT 38.9760")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE user_settings ADD COLUMN last_weather_date TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE user_settings ADD COLUMN last_mood_date TEXT")
+        except sqlite3.OperationalError:
             pass
 
         # Index on remind_at and is_sent for fast scheduler queries
@@ -203,7 +228,8 @@ def set_user_setting(user_id: int, setting_key: str, value: Any):
         # Ensure user row exists
         conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
         # Update the setting
-        if setting_key in ['weather_time', 'mood_time', 'city']:
+        allowed_keys = ['weather_time', 'mood_time', 'city', 'latitude', 'longitude', 'last_weather_date', 'last_mood_date']
+        if setting_key in allowed_keys:
             conn.execute(f"UPDATE user_settings SET {setting_key} = ? WHERE user_id = ?", (value, user_id))
         conn.commit()
 

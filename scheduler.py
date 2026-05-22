@@ -139,9 +139,6 @@ async def check_daily_routines_loop(bot: Bot):
     
     logger.info("Daily routines scheduler started.")
     
-    # Store last sent date to avoid duplicate sending on the same day
-    last_sent = {"weather": {}, "mood": {}}
-    
     while True:
         try:
             now = datetime.now(config.BOT_TZ)
@@ -154,34 +151,44 @@ async def check_daily_routines_loop(bot: Bot):
                 
                 # Check weather
                 weather_time = s.get('weather_time')
-                if weather_time and weather_time == current_time_str:
-                    if last_sent["weather"].get(user_id) != today_str:
-                        logger.info(f"Sending daily weather to {user_id}")
-                        w_data = await weather.get_weather_forecast()
-                        msg = weather.format_weather_message(w_data)
-                        try:
-                            await bot.send_message(chat_id=user_id, text=msg, parse_mode="Markdown")
-                            last_sent["weather"][user_id] = today_str
-                        except Exception as e:
-                            logger.error(f"Failed to send weather to {user_id}: {e}")
+                last_w_date = s.get('last_weather_date')
+                if weather_time and last_w_date != today_str and weather_time <= current_time_str:
+                    logger.info(f"Sending daily weather to {user_id} (scheduled for {weather_time})")
+                    # Fetch coordinates
+                    lat = s.get('latitude')
+                    lon = s.get('longitude')
+                    city = s.get('city') or weather.DEFAULT_CITY
+                    if lat is None or lon is None:
+                        lat, lon = weather.DEFAULT_LAT, weather.DEFAULT_LON
+                        
+                    w_data = await weather.get_weather_forecast(lat, lon)
+                    msg = weather.format_weather_message(w_data, city)
+                    try:
+                        await bot.send_message(chat_id=user_id, text=msg, parse_mode="Markdown")
+                        database.set_user_setting(user_id, 'last_weather_date', today_str)
+                        logger.info(f"Daily weather sent successfully to {user_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to send weather to {user_id}: {e}")
                 
                 # Check mood
                 mood_time = s.get('mood_time')
-                if mood_time and mood_time == current_time_str:
-                    if last_sent["mood"].get(user_id) != today_str:
-                        logger.info(f"Sending daily mood prompt to {user_id}")
-                        try:
-                            await bot.send_message(
-                                chat_id=user_id,
-                                text="Как прошел твой день? Поделись настроением:",
-                                reply_markup=mood.get_mood_keyboard()
-                            )
-                            last_sent["mood"][user_id] = today_str
-                        except Exception as e:
-                            logger.error(f"Failed to send mood prompt to {user_id}: {e}")
+                last_m_date = s.get('last_mood_date')
+                if mood_time and last_m_date != today_str and mood_time <= current_time_str:
+                    logger.info(f"Sending daily mood prompt to {user_id} (scheduled for {mood_time})")
+                    try:
+                        await bot.send_message(
+                            chat_id=user_id,
+                            text="Как прошел твой день? Поделись настроением:",
+                            reply_markup=mood.get_mood_keyboard()
+                        )
+                        database.set_user_setting(user_id, 'last_mood_date', today_str)
+                        logger.info(f"Daily mood prompt sent successfully to {user_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to send mood prompt to {user_id}: {e}")
                             
         except Exception as e:
             logger.error(f"Error in daily routines loop: {e}", exc_info=True)
             
         # Check every 30 seconds
         await asyncio.sleep(30)
+

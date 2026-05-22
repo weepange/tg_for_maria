@@ -3,8 +3,9 @@ handlers/fun.py — Развлекательные и милые команды 
 """
 
 import random
-from aiogram import Router, types
+from aiogram import Router, types, F
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
 
@@ -28,12 +29,49 @@ DATE_IDEAS = [
     "🛍️ **Шоппинг друг для друга:** Зайдите в магазин и выберите друг другу смешной или милый подарок в пределах небольшой суммы.",
     "🍳 **Завтрак в постель:** Приготовьте вместе вкусный завтрак (даже если сейчас вечер) и съешьте его в кровати.",
     "📝 **Письма в будущее:** Напишите друг другу письма и договоритесь открыть их через год.",
-    "🌃 **Ночной город:** Выйдите на улицу поздно вечером, когда почти нет людей и машин, и насладитесь тишиной."
+    "🌃 **Ночной город:** Выйдите на улицу поздно вечером, когда почти нет людей и машин, и насладитесь тишиной.",
+    "🏰 **Культурный поход:** Посетите местный музей, выставку или галерею, в которой никогда не были.",
+    "🎭 **Театр или стендап:** Сходите вместе на спектакль или вечер стендап-комедии для поднятия настроения.",
+    "🛹 **Активный день:** Возьмите напрокат велики, самокаты или ролики и покатайтесь по парку.",
+    "🎈 **Карта желаний:** Вместе вырежьте картинки из старых журналов и сделайте коллаж ваших совместных целей.",
+    "🛶 **Водная прогулка:** Если позволяет погода, покатайтесь на катамаране, лодке или сапах.",
+    "🎡 **Парк аттракционов:** Покатайтесь на колесе обозрения, поешьте сладкой ваты и вспомните детство.",
+    "⛺ **Кемпинг на балконе:** Разложите спальники/подушки на балконе или у окна, зажгите гирлянды и общайтесь.",
+    "🥗 **Слепая дегустация:** Завяжите друг другу глаза и угадывайте разные вкусы еды.",
+    "💌 **Вечер благодарности:** Напишите на листочках 10 вещей, за которые вы цените друг друга, и прочитайте вслух.",
+    "🗺️ **План будущего путешествия:** Детально распланируйте поездку вашей мечты до мельчайших деталей (отели, места, еда)."
 ]
+
+def get_date_keyboard() -> types.InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Другая идея", callback_data="next_date_idea")
+    return builder.as_markup()
 
 @router.message(Command("date_idea"))
 async def cmd_date_idea(message: types.Message):
     """Generates a random date idea."""
     idea = random.choice(DATE_IDEAS)
     text = f"💡 **Идея для свидания / уютного вечера:**\n\n{idea}"
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, parse_mode="Markdown", reply_markup=get_date_keyboard())
+
+@router.callback_query(F.data == "next_date_idea")
+async def cb_next_date_idea(callback: types.CallbackQuery):
+    """Generates another random date idea and edits the message."""
+    await callback.answer()
+    
+    # Get the current idea to avoid repeating it immediately if possible
+    current_text = callback.message.text
+    available_ideas = [idea for idea in DATE_IDEAS if idea not in current_text]
+    
+    if not available_ideas:
+        available_ideas = DATE_IDEAS
+        
+    idea = random.choice(available_ideas)
+    text = f"💡 **Идея для свидания / уютного вечера:**\n\n{idea}"
+    
+    # Edit message text and keep the button
+    await callback.message.edit_text(
+        text, 
+        parse_mode="Markdown", 
+        reply_markup=get_date_keyboard()
+    )

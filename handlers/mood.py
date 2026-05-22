@@ -10,6 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import database
 import compliments
+import config
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -20,6 +21,14 @@ MOODS = {
     "3": "😐 Нормально",
     "4": "🙂 Хорошо",
     "5": "🥰 Отлично!"
+}
+
+MOOD_EMOJIS = {
+    1: "😢",
+    2: "🙁",
+    3: "😐",
+    4: "🙂",
+    5: "🥰"
 }
 
 def get_mood_keyboard() -> types.InlineKeyboardMarkup:
@@ -51,6 +60,27 @@ async def cmd_mood_sub(message: types.Message):
         database.set_user_setting(user_id, "mood_time", "21:00")
         await message.answer("💖 **Записал!** Теперь каждый вечер в 21:00 я буду спрашивать, как прошел твой день.")
 
+@router.message(Command("mood_history"))
+async def cmd_mood_history(message: types.Message):
+    """Shows the user's mood logs for the last 7 entries."""
+    user_id = message.from_user.id
+    logs = database.get_mood_logs(user_id, limit=7)
+    
+    if not logs:
+        await message.answer("История настроения пока пуста! Запиши его с помощью команды `/mood`.")
+        return
+        
+    text = "📅 **История твоего настроения за последние дни:**\n\n"
+    # logs are ordered DESC (newest first), reverse to show chronological order
+    for log in reversed(logs):
+        date_str = log['date']
+        score = log['score']
+        emoji = MOOD_EMOJIS.get(score, "❓")
+        status = MOODS.get(str(score), "Неизвестно").split(maxsplit=1)[1]
+        text += f"• `{date_str}`: {emoji} {status}\n"
+        
+    await message.answer(text, parse_mode="Markdown")
+
 @router.callback_query(F.data.startswith("mood_"))
 async def cb_mood_selected(callback: types.CallbackQuery):
     await callback.answer()
@@ -59,8 +89,8 @@ async def cb_mood_selected(callback: types.CallbackQuery):
     score = int(score_str)
     user_id = callback.from_user.id
     
-    # Log mood
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    # Log mood using BOT_TZ
+    today_str = datetime.now(config.BOT_TZ).strftime("%Y-%m-%d")
     database.log_mood(user_id, today_str, score)
     
     # Remove buttons
@@ -68,13 +98,18 @@ async def cb_mood_selected(callback: types.CallbackQuery):
     
     # Respond based on score
     if score in [1, 2]:
-        text = "Мне очень жаль, что тебе сегодня грустно. 🫂\nПомни, что ты со всем справишься, а плохие дни случаются у всех. Главное — хорошенько отдохнуть!\n\nЛови немного милоты, чтобы поднять настроение:"
-        await callback.message.answer(text)
+        text = "Мне очень жаль, что тебе сегодня грустно. 🫂\nПомни, что ты со всем справишься, а плохие дни случаются у всех. Главное — хорошенько отдохнуть!\n\nЛови немного милоты для настроения:"
         
-        # Send a cute picture to cheer up
+        # Try to send photo with caption
         photo = await compliments.get_pinterest_image()
         if photo:
-            await callback.message.answer_photo(photo)
+            try:
+                await callback.message.answer_photo(photo, caption=text)
+            except Exception as e:
+                logger.error(f"Failed to send mood cheer-up photo: {e}")
+                await callback.message.answer(text)
+        else:
+            await callback.message.answer(text)
             
     elif score == 3:
         await callback.message.answer("Обычный день — это тоже хорошо! Завари вкусный чай и отдохни вечером. ☕")

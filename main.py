@@ -31,9 +31,11 @@ async def set_bot_commands(bot: Bot):
         BotCommand(command="compliment", description="Ежедневные комплименты"),
         BotCommand(command="clear_photos", description="Очистить коллекцию комплимент-картинок"),
         BotCommand(command="weather", description="Прогноз погоды и советы"),
+        BotCommand(command="set_city", description="Выбрать город для погоды"),
         BotCommand(command="weather_sub", description="Вкл/Выкл утреннюю рассылку погоды"),
         BotCommand(command="date_idea", description="Случайная уютная идея на вечер"),
         BotCommand(command="mood", description="Трекер настроения: как прошел день?"),
+        BotCommand(command="mood_history", description="История настроения за неделю"),
         BotCommand(command="mood_sub", description="Вкл/Выкл вечерний опрос про настроение"),
     ]
     await bot.set_my_commands(commands)
