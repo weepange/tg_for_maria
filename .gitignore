@@ -1,0 +1,29 @@
+# Environment variables
+.env
+
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary / Scratch files
+scraped_links.txt
+scratch*.py
+explore*.py
