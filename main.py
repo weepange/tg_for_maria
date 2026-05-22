@@ -30,6 +30,11 @@ async def set_bot_commands(bot: Bot):
         BotCommand(command="roll", description="Кто моет посуду (честный выбор)"),
         BotCommand(command="compliment", description="Ежедневные комплименты"),
         BotCommand(command="clear_photos", description="Очистить коллекцию комплимент-картинок"),
+        BotCommand(command="weather", description="Прогноз погоды и советы"),
+        BotCommand(command="weather_sub", description="Вкл/Выкл утреннюю рассылку погоды"),
+        BotCommand(command="date_idea", description="Случайная уютная идея на вечер"),
+        BotCommand(command="mood", description="Трекер настроения: как прошел день?"),
+        BotCommand(command="mood_sub", description="Вкл/Выкл вечерний опрос про настроение"),
     ]
     await bot.set_my_commands(commands)
 
@@ -39,7 +44,9 @@ async def on_startup(bot: Bot) -> None:
     
     # Start the reminders background loop
     asyncio.create_task(scheduler.check_reminders_loop(bot))
-    
+    # Start the daily routines background loop (weather, mood)
+    asyncio.create_task(scheduler.check_daily_routines_loop(bot))
+
 
     # Set bot commands in Telegram menu
     await set_bot_commands(bot)

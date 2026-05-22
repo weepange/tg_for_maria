@@ -44,6 +44,26 @@ def init_db():
             )
         """)
         
+        # Create user settings table for weather and mood
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id INTEGER PRIMARY KEY,
+                weather_time TEXT,
+                mood_time TEXT,
+                city TEXT DEFAULT 'Краснодар'
+            )
+        """)
+        
+        # Create mood logs table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS mood_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                score INTEGER NOT NULL
+            )
+        """)
+        
         # Self-migration 1: try to add the 'interval' column if it's missing
         try:
             conn.execute("ALTER TABLE reminders ADD COLUMN interval TEXT DEFAULT 'once'")
@@ -165,3 +185,50 @@ def delete_all_compliment_photos(user_id: int) -> int:
         cursor = conn.execute("DELETE FROM compliment_photos WHERE user_id = ?", (user_id,))
         conn.commit()
         return cursor.rowcount
+
+# --- User Settings Functions ---
+
+def get_user_setting(user_id: int, setting_key: str) -> Any:
+    """Retrieves a specific setting for the user."""
+    with get_connection() as conn:
+        # Check if user exists
+        row = conn.execute("SELECT * FROM user_settings WHERE user_id = ?", (user_id,)).fetchone()
+        if not row:
+            return None
+        return dict(row).get(setting_key)
+
+def set_user_setting(user_id: int, setting_key: str, value: Any):
+    """Sets a specific setting for the user."""
+    with get_connection() as conn:
+        # Ensure user row exists
+        conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
+        # Update the setting
+        if setting_key in ['weather_time', 'mood_time', 'city']:
+            conn.execute(f"UPDATE user_settings SET {setting_key} = ? WHERE user_id = ?", (value, user_id))
+        conn.commit()
+
+def get_all_user_settings() -> List[Dict[str, Any]]:
+    """Retrieves all user settings for background tasks."""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM user_settings").fetchall()
+        return [dict(row) for row in rows]
+
+# --- Mood Logs Functions ---
+
+def log_mood(user_id: int, date: str, score: int):
+    """Logs the user's mood score for a specific date (YYYY-MM-DD)."""
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO mood_logs (user_id, date, score) VALUES (?, ?, ?)",
+            (user_id, date, score)
+        )
+        conn.commit()
+
+def get_mood_logs(user_id: int, limit: int = 7) -> List[Dict[str, Any]]:
+    """Retrieves recent mood logs for the user."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT date, score FROM mood_logs WHERE user_id = ? ORDER BY date DESC LIMIT ?",
+            (user_id, limit)
+        ).fetchall()
+        return [dict(row) for row in rows]
